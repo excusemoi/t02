@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -36,8 +35,31 @@ func parseCommandLineArgs() map[string]string {
 	return args
 }
 
-func VariableTranslit(s string) string {
-	return ""
+func VariableTranslit(s string) map[string]struct{} {
+	var (
+		cyrillicStrings        = make(map[string]struct{})
+		cyrillicString  string = s
+	)
+	for i, arr := range translations.EnVarietyTranslations {
+		r, _ := regexp.Compile(arr[0][0])
+		cyrillicString = r.ReplaceAllString(cyrillicString, arr[1][0])
+		if len(arr[1]) > 1 {
+			for _, ch := range arr[1] {
+				cyrillicStringCp := s
+				for j, nArr := range translations.EnVarietyTranslations {
+					r, _ = regexp.Compile(nArr[0][0])
+					if j == i {
+						cyrillicStringCp = r.ReplaceAllString(cyrillicStringCp, ch)
+					} else {
+						cyrillicStringCp = r.ReplaceAllString(cyrillicStringCp, nArr[1][0])
+					}
+				}
+				cyrillicStrings[cyrillicStringCp] = struct{}{}
+			}
+		}
+	}
+	cyrillicStrings[cyrillicString] = struct{}{}
+	return cyrillicStrings
 }
 
 func Translit(s string) string {
@@ -64,9 +86,12 @@ func TranslitUtil() {
 			os.Exit(1)
 		}
 		contentToTranslit += fileContent
-		fmt.Println(contentToTranslit)
 	}
-	contentToTranslit = Translit(contentToTranslit)
+	translited := VariableTranslit(contentToTranslit)
+	contentToTranslit = ""
+	for k := range translited {
+		contentToTranslit += k + "\n"
+	}
 	if outputPath, in := args[outputPathKey]; in {
 		if err := writeContentToFile(outputPath, contentToTranslit); err != nil {
 			io.WriteString(os.Stderr, err.Error()+" ")
