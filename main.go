@@ -1,12 +1,16 @@
 package main
 
 import (
+	"encoding/csv"
 	"flag"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"regexp"
 	"search/t02/translations"
+	"strings"
+	"unicode"
 )
 
 const (
@@ -36,22 +40,23 @@ func parseCommandLineArgs() map[string]string {
 }
 
 func VariableTranslit(s string) map[string]struct{} {
+	s = strings.TrimSpace(s)
 	var (
 		cyrillicStrings        = make(map[string]struct{})
 		cyrillicString  string = s
 	)
 	for i, arr := range translations.EnVarietyTranslations {
 		r, _ := regexp.Compile(arr[0][0])
-		cyrillicString = r.ReplaceAllString(cyrillicString, arr[1][0])
+		cyrillicString = ReplaceAllString(r, cyrillicString, arr[1][0])
 		if len(arr[1]) > 1 {
 			for _, ch := range arr[1] {
 				cyrillicStringCp := s
 				for j, nArr := range translations.EnVarietyTranslations {
 					r, _ = regexp.Compile(nArr[0][0])
 					if j == i {
-						cyrillicStringCp = r.ReplaceAllString(cyrillicStringCp, ch)
+						cyrillicStringCp = ReplaceAllString(r, cyrillicStringCp, ch)
 					} else {
-						cyrillicStringCp = r.ReplaceAllString(cyrillicStringCp, nArr[1][0])
+						cyrillicStringCp = ReplaceAllString(r, cyrillicStringCp, nArr[1][0])
 					}
 				}
 				cyrillicStrings[cyrillicStringCp] = struct{}{}
@@ -60,6 +65,35 @@ func VariableTranslit(s string) map[string]struct{} {
 	}
 	cyrillicStrings[cyrillicString] = struct{}{}
 	return cyrillicStrings
+}
+
+func ReplaceAllString(r *regexp.Regexp, src, repl string) string {
+	sr := []rune(strings.TrimSpace(src))
+	/*if sr[0] == 'h' {
+		src = src[1:]
+		src = "эйч" + src
+	}
+	if sr[0] == 'H' {
+		src = src[1:]
+		src = "Эйч" + src
+	}
+	if sr[0] == 'j' {
+		src = src[1:]
+		src = "джи" + src
+	}
+	*/
+	if sr[len(sr)-1] == 'p' {
+		src = string(sr[:len(sr)-1])
+		src += "пи"
+		return src
+	}
+	/*
+		if sr[len(sr)-1] == 'P' {
+			src = string(sr[:len(sr)-1])
+			src += "Пи"
+		}*/
+
+	return r.ReplaceAllString(src, repl)
 }
 
 func Translit(s string) string {
@@ -92,6 +126,7 @@ func TranslitUtil() {
 	for k := range translited {
 		contentToTranslit += k + "\n"
 	}
+	fmt.Println(contentToTranslit)
 	if outputPath, in := args[outputPathKey]; in {
 		if err := writeContentToFile(outputPath, contentToTranslit); err != nil {
 			io.WriteString(os.Stderr, err.Error()+" ")
@@ -124,6 +159,53 @@ func getFileContent(path string) (string, error) {
 	return string(content), nil
 }
 
+func TranslitCsv(pathToFile string) error {
+	var (
+		file, err  = os.Open(pathToFile)
+		newFile, _ = os.Create("translited" + pathToFile)
+	)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	defer newFile.Close()
+
+	reader := csv.NewReader(file)
+	writer := csv.NewWriter(newFile)
+	reader.Comma = ';'
+	reader.FieldsPerRecord = 4
+	reader.LazyQuotes = true
+
+	for {
+		record, e := reader.Read()
+		if e != nil {
+			break
+		}
+		if containsCyrillic(record[2]) {
+			continue
+		}
+		translited := VariableTranslit(strings.ToLower(record[2]))
+		translitedString := ""
+		for k := range translited {
+			translitedString += k + "|"
+		}
+		fmt.Printf("%s translited -> %s\n", record[2], translitedString)
+		writer.Write([]string{record[2], translitedString})
+	}
+	return nil
+}
+
+func containsCyrillic(s string) bool {
+	sr := []rune(s)
+	for _, r := range sr {
+		if unicode.Is(unicode.Cyrillic, r) {
+			return true
+		}
+	}
+	return false
+}
+
 func main() {
-	TranslitUtil()
+	//TranslitUtil()
+	TranslitCsv("brands-extended.csv")
 }
