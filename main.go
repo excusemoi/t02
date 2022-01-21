@@ -11,6 +11,8 @@ import (
 	"search/t02/translations"
 	"strings"
 	"unicode"
+
+	"github.com/gen1us2k/transcript"
 )
 
 const (
@@ -67,8 +69,14 @@ func VariableTranslit(s string) map[string]struct{} {
 	return cyrillicStrings
 }
 
+func TransciptionTranslit(s string) map[string]struct{} {
+	cyrillicStrings := make(map[string]struct{})
+	cyrillicStrings[transcript.TransliterateRussian(s)] = struct{}{}
+	return cyrillicStrings
+}
+
 func ReplaceAllString(r *regexp.Regexp, src, repl string) string {
-	sr := []rune(strings.TrimSpace(src))
+	//sr := []rune(strings.TrimSpace(src))
 	/*if sr[0] == 'h' {
 		src = src[1:]
 		src = "эйч" + src
@@ -82,17 +90,16 @@ func ReplaceAllString(r *regexp.Regexp, src, repl string) string {
 		src = "джи" + src
 	}
 	*/
-	if sr[len(sr)-1] == 'p' {
+	/*if sr[len(sr)-1] == 'p' {
 		src = string(sr[:len(sr)-1])
 		src += "пи"
 		return src
-	}
+	}*/
 	/*
 		if sr[len(sr)-1] == 'P' {
 			src = string(sr[:len(sr)-1])
 			src += "Пи"
 		}*/
-
 	return r.ReplaceAllString(src, repl)
 }
 
@@ -184,7 +191,7 @@ func TranslitCsv(pathToFile string) error {
 		if containsCyrillic(record[2]) {
 			continue
 		}
-		translited := VariableTranslit(strings.ToLower(record[2]))
+		translited := TransciptionTranslit(strings.ToLower(record[2]))
 		translitedString := ""
 		for k := range translited {
 			translitedString += k + "|"
@@ -206,6 +213,6 @@ func containsCyrillic(s string) bool {
 }
 
 func main() {
-	//TranslitUtil()
-	TranslitCsv("brands-extended.csv")
+	transcript.LoadDict("")
+	fmt.Println(transcript.GetTranscription("абв"))
 }
